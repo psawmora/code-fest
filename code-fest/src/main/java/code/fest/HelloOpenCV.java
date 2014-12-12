@@ -15,7 +15,7 @@ public class HelloOpenCV {
         // Load the native library.
         //
         loadLibraries();
-//        new DetectFaceDemo().run();
+//        new Ball().startBallTracking();
         new WebCamCaptureTest().startCapturing();
     }
 

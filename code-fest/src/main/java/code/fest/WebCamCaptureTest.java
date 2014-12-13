@@ -174,23 +174,24 @@ public class WebCamCaptureTest extends JPanel {
                     MatOfPoint maxCont = matOfPointList.get(index);
                     MatOfInt hull = new MatOfInt();
                     Imgproc.convexHull(maxCont, hull);
+                    MatOfInt4 defects1 = new MatOfInt4();
+                    Imgproc.convexityDefects(maxCont, hull, defects1);
+                    int noOfDefects = defects1.rows();
+                    List<Point> tips = new ArrayList<>();
+                    List<Point> contList = maxCont.toList();
+                    calculateDefectPoints(defects1, noOfDefects, tips, contList);
+
 
                     List<MatOfPoint> hullList = new ArrayList<>();
 
                     Moments moments = Imgproc.moments(matOfPointList.get(index), true);
                     extractContureDetails(moments, cog);
 
-                    MatOfPoint2f matOfPoint2f = new MatOfPoint2f(matOfPointList.get(index).toArray());
-                    MatOfPoint2f matOfPoint2fOut = new MatOfPoint2f();
-                    Imgproc.approxPolyDP(matOfPoint2f, matOfPoint2fOut, 1, true);
-
-
                     Imgproc.drawContours(frame, matOfPointList, index, new Scalar(0, 255, 0), 5);
-
-                    Imgproc.drawContours(frame, hullList, 0, new Scalar(0, 255, 0), 5);
-
                     Core.circle(frame, cog, 5, new Scalar(0, 255, 0), 5);
-
+                    for(Point point : tips){
+                        Core.line(frame,point,cog,new Scalar(0, 255, 10),4);
+                    }
 
                    /* Mat hsv = new Mat();
 
@@ -243,6 +244,17 @@ public class WebCamCaptureTest extends JPanel {
             } catch (Exception e) {
                 e.printStackTrace();
             }
+        }
+    }
+
+    private void calculateDefectPoints(MatOfInt4 defects1, int noOfDefects, List<Point> tips, List<Point> contList) {
+        for (int i = 0; i < noOfDefects; i++) {
+            Mat row = defects1.row(i);
+//            double start = row.get(0, 0)[0];
+            double start = row.get(0, 0)[2];
+
+            Point point1 = contList.get((int) start);
+            tips.add(point1);
         }
     }
 

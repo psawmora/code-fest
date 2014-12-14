@@ -28,19 +28,19 @@ public class WebCamCaptureTest extends JPanel {
 
     private BufferedImage bufferedImage;
 
-    int H_MIN_1 = 18;
+    int H_MIN_1 = 92;
 
-    int S_MIN_1 = 64;
+    int S_MIN_1 = 174;
 
-    int V_MIN_1 = 1;
+    int V_MIN_1 = 144;
 
     int W_MIN_1 = 0;
 
-    int H_MAX_1 = 23;
+    int H_MAX_1 = 120;
 
-    int S_MAX_1 = 229;
+    int S_MAX_1 = 255;
 
-    int V_MAX_1 = 251;
+    int V_MAX_1 = 255;
 
     int W_MAX_1 = 0;
 
@@ -83,6 +83,7 @@ public class WebCamCaptureTest extends JPanel {
     AtomicBoolean isProceed = new AtomicBoolean(true);
 
     public void startCapturing() {
+
         JFrame jFrame = new JFrame("Video");
         jFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         jFrame.setSize(1000, 1000);
@@ -96,6 +97,13 @@ public class WebCamCaptureTest extends JPanel {
         WebCamCaptureTest threshHoldPanel1 = new WebCamCaptureTest();
         jFrame2.setContentPane(threshHoldPanel1);
         jFrame2.setVisible(true);
+
+        JFrame jFrame3 = new JFrame("Edge-1");
+        jFrame3.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        jFrame3.setSize(1000, 1000);
+        WebCamCaptureTest edgePlane = new WebCamCaptureTest();
+        jFrame3.setContentPane(edgePlane);
+        jFrame3.setVisible(true);
 
         addSliders("H_MIN_1", panel, H_MIN_1);
         addSliders("S_MIN_1", panel, S_MIN_1);
@@ -127,7 +135,8 @@ public class WebCamCaptureTest extends JPanel {
         BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(System.in));
 
         Mat frame = new Mat();
-        Mat kernel = Mat.ones(3, 3, CvType.CV_32S);
+        Mat kernel = Mat.ones(3, 3, CvType.CV_8U).setTo(new Scalar(.33));
+        Mat kernel2 = Mat.ones(3, 3, CvType.CV_32S);
         Mat threshold1 = new Mat();
         Mat hierarchy = new Mat();
         Point cog = new Point();
@@ -142,24 +151,35 @@ public class WebCamCaptureTest extends JPanel {
                             V_MAX_1 + "");
 
                     Imgproc.cvtColor(frame, threshold1, Imgproc.COLOR_BGR2HSV);
+
+                    Mat hsv = threshold1.clone();
+                    //                    Imgproc.cvtColor(frame, hsv, Imgproc.COLOR_BGR2GRAY);
+                    //                    Imgproc.distanceTransform(hsv, hsv, Imgproc.CV_DIST_L2, 5);
+                    //                    Imgproc.threshold(hsv, hsv, H_MIN_1, H_MAX_1,
+                    // Imgproc.THRESH_BINARY_INV + Imgproc.THRESH_OTSU);
+
                     Core.inRange(threshold1, new Scalar(H_MIN_1, S_MIN_1, V_MIN_1, W_MIN_1),
                             new Scalar(H_MAX_1, S_MAX_1, V_MAX_1, W_MAX_1), threshold1);
                     //                    Imgproc.GaussianBlur(threshold1, threshold1, new Size(5, 5), 0);
 
-                    Imgproc.morphologyEx(threshold1, threshold1, Imgproc.MORPH_OPEN, kernel);
 
+                    Imgproc.morphologyEx(threshold1, threshold1, Imgproc.MORPH_OPEN, kernel);
+                    Mat morphOpen = threshold1.clone();
+                    Imgproc.GaussianBlur(morphOpen, morphOpen, new Size(3, 3), 1.0);
+
+                    Mat edge = threshold1.clone();
                     /*Imgproc.GaussianBlur(threshold1, threshold1, new Size(5, 5), 0);
                     Mat thresMat = new Mat();
                     Imgproc.threshold(threshold1, threshold1, H_MIN_1, H_MAX_1, Imgproc.THRESH_BINARY_INV + Imgproc.THRESH_OTSU);
                     //                    Photo.fastNlMeansDenoising(threshold1, thresMat, 5.0f, 10, 10);
 
 */
-                    Mat outFinal = threshold1;
 
 
                     List<MatOfPoint> matOfPointList = new ArrayList<>();
 
-                    Imgproc.findContours(threshold1, matOfPointList, hierarchy, Imgproc.RETR_TREE, Imgproc.CHAIN_APPROX_SIMPLE);
+                    Imgproc.findContours(threshold1, matOfPointList, hierarchy, Imgproc.RETR_EXTERNAL,
+                            Imgproc.CHAIN_APPROX_SIMPLE);
                     double max = 0.0;
                     int index = 0;
                     for (int i = 0; i < matOfPointList.size(); i++) {
@@ -177,69 +197,36 @@ public class WebCamCaptureTest extends JPanel {
                     MatOfInt4 defects1 = new MatOfInt4();
                     Imgproc.convexityDefects(maxCont, hull, defects1);
                     int noOfDefects = defects1.rows();
-                    List<Point> tips = new ArrayList<>();
+
+                    List<Point> allConvexPoints = new ArrayList<>();
+                    List<Point> convexPoints = new ArrayList<>();
+                    List<Point> tipPoints = new ArrayList<>();
+                    List<Point> realTips = new ArrayList<>();
+
                     List<Point> contList = maxCont.toList();
-                    calculateDefectPoints(defects1, noOfDefects, tips, contList);
-
-
-                    List<MatOfPoint> hullList = new ArrayList<>();
+                    calculateDefectPoints(defects1, noOfDefects, allConvexPoints, convexPoints, tipPoints, contList, realTips);
 
                     Moments moments = Imgproc.moments(matOfPointList.get(index), true);
                     extractContureDetails(moments, cog);
 
-                    Imgproc.drawContours(frame, matOfPointList, index, new Scalar(0, 255, 0), 5);
+//                    Imgproc.drawContours(frame, matOfPointList, index, new Scalar(0, 255, 0), 5);
                     Core.circle(frame, cog, 5, new Scalar(0, 255, 0), 5);
-                    for(Point point : tips){
-                        Core.line(frame,point,cog,new Scalar(0, 255, 10),4);
+
+                    for (Point point : convexPoints) {
+                        Core.circle(frame, point, 2, new Scalar(255, 0, 255), 3);
+                    }
+                    Mat onlyPoints = new Mat(new Size(650,480),CvType.CV_8UC1,new Scalar(255,255,255));
+
+                    for (Point point : realTips) {
+                        Core.line(onlyPoints, point, cog, new Scalar(0, 255, 255), 3);
+                        Core.circle(onlyPoints, point, 2, new Scalar(255, 255, 255), 3);
                     }
 
-                   /* Mat hsv = new Mat();
 
-                    Imgproc.cvtColor(frame, hsv, Imgproc.COLOR_BGR2HSV);
-                    Mat threshold = new Mat();
-                    Mat threshold1 = new Mat();
-                    Mat threshold2 = new Mat();
-
-                    Core.inRange(hsv, new Scalar(H_MIN_1, S_MIN_1, V_MIN_1, W_MIN_1),
-                            new Scalar(H_MAX_1, S_MAX_1, V_MAX_1, W_MAX_1), threshold1);
-
-                    Core.inRange(hsv, new Scalar(H_MIN_2, S_MIN_2, V_MIN_2, W_MIN_2),
-                            new Scalar(H_MAX_2, S_MAX_2, V_MAX_2, W_MAX_2), threshold2);
-
-                    Core.bitwise_or(threshold1, threshold2, threshold);
-
-                    Imgproc.GaussianBlur(threshold1, threshold1, new Size(5, 5), 0);
-
-*//*
-                    Mat circles = new Mat();
-                    Imgproc.HoughCircles(threshold1, circles, Imgproc.CV_HOUGH_GRADIENT, 2,
-                            threshold1.height() / 4, 500, 50, 0, 0);
-*//*
-
-
-                    List<Mat> matList = new ArrayList<>();
-                    Core.split(hsv, matList);
-                    Mat s = matList.get(0);
-                    Mat v = matList.get(1);
-
-
-                    Mat outFinal = threshold1;
-
-
-                    Rect rect = new Rect(200, 200, 100, 100);
-                    Rect[] rects = new Rect[]{rect};
-                    CamShifting camShifting = new CamShifting();
-                    camShifting.create_tracked_object(frame, rects, camShifting);
-                    RotatedRect rotatedRect = camShifting.camshift_track_face(frame, rects, camShifting);
-
-                    Mat bgr = camShifting.bgr;
-                    System.out.println(rotatedRect.center.x + " : " + rotatedRect.center.y);
-
-                    Core.circle(bgr, rotatedRect.center, 20, new Scalar(5));*/
-
-                    repaint(jFrame, panel, outFinal);
-                    repaint(jFrame2, threshHoldPanel1, frame);
-                    //                    readNewParams(bufferedReader);
+                    repaint(jFrame, panel, morphOpen);
+                    repaint(jFrame2, threshHoldPanel1, onlyPoints);
+                    repaint(jFrame3, edgePlane, hsv);
+                    
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -247,15 +234,69 @@ public class WebCamCaptureTest extends JPanel {
         }
     }
 
-    private void calculateDefectPoints(MatOfInt4 defects1, int noOfDefects, List<Point> tips, List<Point> contList) {
+    private void calculateDefectPoints(MatOfInt4 defects1,
+                                       int noOfDefects,
+                                       List<Point> allConvexPoints,
+                                       List<Point> convexPoints,
+                                       List<Point> tips,
+                                       List<Point> contList,
+                                       List<Point> realTips) {
+        double maxDepth = 0.0;
         for (int i = 0; i < noOfDefects; i++) {
             Mat row = defects1.row(i);
-//            double start = row.get(0, 0)[0];
-            double start = row.get(0, 0)[2];
-
-            Point point1 = contList.get((int) start);
-            tips.add(point1);
+            double furthest = row.get(0, 0)[2];
+            double start = row.get(0, 0)[1];
+            double depth = row.get(0, 0)[3];
+            if (maxDepth < depth) {
+                maxDepth = depth;
+            }
+            allConvexPoints.add(contList.get((int) start));
+            tips.add(contList.get((int) furthest));
         }
+
+        for (int i = 0; i < noOfDefects; i++) {
+            Mat row = defects1.row(i);
+            double start = row.get(0, 0)[2];
+            double depth = row.get(0, 0)[3];
+            if (maxDepth / depth < 2) {
+                Point point1 = contList.get((int) start);
+                convexPoints.add(point1);
+            }
+
+        }
+        findTips(defects1, noOfDefects, allConvexPoints, maxDepth, tips, realTips);
+    }
+
+    private void findTips(MatOfInt4 defects1,
+                          int noOfDefects,
+                          List<Point> allConvexPoints,
+                          double maxDepth,
+                          List<Point> tips,
+                          List<Point> realTips) {
+
+        for (int i = 0; i < noOfDefects; i++) {
+            int pdx = (i == 0) ? (noOfDefects - 1) : (i - 1);
+            int sdx = (i == noOfDefects - 1) ? 0 : (i + 1);
+            int i1 = angleBetween(tips.get(i), allConvexPoints.get(sdx), allConvexPoints.get(pdx));
+            if (i1 < 60) {
+                break;
+            }
+            Mat row = defects1.row(i);
+            double start = row.get(0, 0)[1];
+            double depth = row.get(0, 0)[3];
+            if (maxDepth / depth < 2) {
+                realTips.add(allConvexPoints.get(pdx));
+                realTips.add(allConvexPoints.get(sdx));
+            }
+        }
+
+    }
+
+    private int angleBetween(Point tip, Point next, Point prev) {
+        return Math.abs((int) Math.round(
+                Math.toDegrees(
+                        Math.atan2(next.x - tip.x, next.y - tip.y) -
+                                Math.atan2(prev.x - tip.x, prev.y - tip.y))));
     }
 
     private void extractContureDetails(Moments moments, Point cog) {
@@ -275,104 +316,6 @@ public class WebCamCaptureTest extends JPanel {
         double m02 = moments.get_m02();
 
     }
-
-    private void test2() {
-/*
-        System.out.println(H_MIN_1 + " " + H_MAX_1 + " | " + S_MIN_1 + " " + S_MAX_1 + " | " + V_MIN_1 + " " +
-                V_MAX_1 + "");
-        Mat threshold1 = new Mat();
-        Imgproc.cvtColor(frame, threshold1, Imgproc.COLOR_BGR2GRAY);
-        Imgproc.GaussianBlur(threshold1, threshold1, new Size(5, 5), 0);
-        Mat thresMat = new Mat();
-*/
-/*
-        Core.inRange(threshold1, new Scalar(H_MIN_1, S_MIN_1, V_MIN_1, W_MIN_1),
-                                    new Scalar(H_MAX_1, S_MAX_1, V_MAX_1, W_MAX_1), threshold1);
-*//*
-
-        Imgproc.threshold(threshold1, threshold1, H_MIN_1, H_MAX_1, Imgproc.THRESH_BINARY_INV + Imgproc.THRESH_OTSU);
-//                    Photo.fastNlMeansDenoising(threshold1, thresMat, 5.0f, 10, 10);
-
-
-        Mat outFinal = threshold1;
-        Mat heireachy = new Mat();
-
-        List<MatOfPoint> matOfPointList = new ArrayList<>();
-
-        Imgproc.findContours(threshold1, matOfPointList, heireachy, Imgproc.RETR_TREE, Imgproc.CHAIN_APPROX_SIMPLE);
-        double max = 0.0;
-        int index = 0;
-        for (int i = 0; i < matOfPointList.size(); i++) {
-            MatOfPoint matOfPoint = matOfPointList.get(i);
-            double area = Imgproc.contourArea(matOfPoint);
-            if (area > max) {
-                max = area;
-                index = i;
-            }
-        }
-        MatOfPoint maxCont = matOfPointList.get(2);
-        MatOfInt hull = new MatOfInt();
-        Imgproc.convexHull(maxCont, hull);
-        Imgproc.drawContours(frame, matOfPointList, 1, new Scalar(0, 255, 0), 5);
-
-       */
-/* Mat hsv = new Mat();
-
-        Imgproc.cvtColor(frame, hsv, Imgproc.COLOR_BGR2HSV);
-        Mat threshold = new Mat();
-        Mat threshold1 = new Mat();
-        Mat threshold2 = new Mat();
-
-        Core.inRange(hsv, new Scalar(H_MIN_1, S_MIN_1, V_MIN_1, W_MIN_1),
-                new Scalar(H_MAX_1, S_MAX_1, V_MAX_1, W_MAX_1), threshold1);
-
-        Core.inRange(hsv, new Scalar(H_MIN_2, S_MIN_2, V_MIN_2, W_MIN_2),
-                new Scalar(H_MAX_2, S_MAX_2, V_MAX_2, W_MAX_2), threshold2);
-
-        Core.bitwise_or(threshold1, threshold2, threshold);
-
-        Imgproc.GaussianBlur(threshold1, threshold1, new Size(5, 5), 0);
-
-*//*
-*/
-/*
-        Mat circles = new Mat();
-        Imgproc.HoughCircles(threshold1, circles, Imgproc.CV_HOUGH_GRADIENT, 2,
-                threshold1.height() / 4, 500, 50, 0, 0);
-*//*
-*/
-/*
-
-
-        List<Mat> matList = new ArrayList<>();
-        Core.split(hsv, matList);
-        Mat s = matList.get(0);
-        Mat v = matList.get(1);
-
-
-        Mat outFinal = threshold1;
-
-
-        Rect rect = new Rect(200, 200, 100, 100);
-        Rect[] rects = new Rect[]{rect};
-        CamShifting camShifting = new CamShifting();
-        camShifting.create_tracked_object(frame, rects, camShifting);
-        RotatedRect rotatedRect = camShifting.camshift_track_face(frame, rects, camShifting);
-
-        Mat bgr = camShifting.bgr;
-        System.out.println(rotatedRect.center.x + " : " + rotatedRect.center.y);
-
-        Core.circle(bgr, rotatedRect.center, 20, new Scalar(5));*//*
-
-
-        repaint(jFrame, panel, outFinal);
-        repaint(jFrame2, threshHoldPanel1, frame);
-        //                    readNewParams(bufferedReader);
-*/
-
-
-    }
-
 
     private void repaint(JFrame jFrame, WebCamCaptureTest panel, Mat outFinal) throws IOException {
         MatOfByte frameBuffer = new MatOfByte();

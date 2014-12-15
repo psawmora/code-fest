@@ -82,6 +82,12 @@ public class WebCamCaptureTest extends JPanel {
 
     AtomicBoolean isProceed = new AtomicBoolean(true);
 
+    private MouseMover mouseMover;
+
+    public WebCamCaptureTest() {
+        mouseMover = new MouseMover();
+    }
+
     public void startCapturing() {
 
         JFrame jFrame = new JFrame("Video");
@@ -178,7 +184,11 @@ public class WebCamCaptureTest extends JPanel {
 
                     List<MatOfPoint> matOfPointList = new ArrayList<>();
 
-                    Imgproc.findContours(threshold1, matOfPointList, hierarchy, Imgproc.RETR_EXTERNAL,
+                    Imgproc.findContours(
+                            threshold1,
+                            matOfPointList,
+                            hierarchy,
+                            Imgproc.RETR_EXTERNAL,
                             Imgproc.CHAIN_APPROX_SIMPLE);
                     double max = 0.0;
                     int index = 0;
@@ -209,24 +219,27 @@ public class WebCamCaptureTest extends JPanel {
                     Moments moments = Imgproc.moments(matOfPointList.get(index), true);
                     extractContureDetails(moments, cog);
 
-//                    Imgproc.drawContours(frame, matOfPointList, index, new Scalar(0, 255, 0), 5);
+                    //                    Imgproc.drawContours(frame, matOfPointList, index, new Scalar(0, 255, 0), 5);
                     Core.circle(frame, cog, 5, new Scalar(0, 255, 0), 5);
 
                     for (Point point : convexPoints) {
                         Core.circle(frame, point, 2, new Scalar(255, 0, 255), 3);
                     }
-                    Mat onlyPoints = new Mat(new Size(650,480),CvType.CV_8UC1,new Scalar(255,255,255));
+                    //                    Mat onlyPoints = new Mat(new Size(650, 480), CvType.CV_8UC1, new Scalar(255, 255, 255));
 
                     for (Point point : realTips) {
-                        Core.line(onlyPoints, point, cog, new Scalar(0, 255, 255), 3);
-                        Core.circle(onlyPoints, point, 2, new Scalar(255, 255, 255), 3);
+                        Core.line(frame, point, cog, new Scalar(0, 255, 255), 3);
+                        Core.circle(frame, point, 2, new Scalar(255, 255, 255), 3);
                     }
+                    if (cog.x > 10 && cog.y > 10) {
+                        mouseMover.moveMouse((int) (cog.x / 1), (int) (cog.y / 1));
 
-
+                    }
+                    System.out.println(cog.x + " : " + cog.y);
                     repaint(jFrame, panel, morphOpen);
-                    repaint(jFrame2, threshHoldPanel1, onlyPoints);
+                    repaint(jFrame2, threshHoldPanel1, frame);
                     repaint(jFrame3, edgePlane, hsv);
-                    
+
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -304,17 +317,12 @@ public class WebCamCaptureTest extends JPanel {
         double m10 = moments.get_m10();
         double m01 = moments.get_m01();
 
-        if (m00 != 0) {   // calculate center
+        if (m00 != 0) {
             int xCenter = (int) Math.round(m10 / m00);
             int yCenter = (int) Math.round(m01 / m00);
             cog.x = xCenter;
             cog.y = yCenter;
         }
-
-        double m11 = moments.get_m11();
-        double m20 = moments.get_m20();
-        double m02 = moments.get_m02();
-
     }
 
     private void repaint(JFrame jFrame, WebCamCaptureTest panel, Mat outFinal) throws IOException {
